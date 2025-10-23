@@ -406,9 +406,3 @@ This project demonstrates enterprise-level healthcare software development pract
 - **ML/AI Capabilities**: Advanced analytics and predictive modeling
 - **Cloud Optimization**: Enhanced AWS services integration
 - **Security Features**: Additional compliance and audit capabilities
-
-**Important**: This is a demonstration project for educational and portfolio purposes. For production healthcare applications, ensure compliance with all applicable regulations including HIPAA, GDPR, and local healthcare data protection laws.
-
----
-
-**Built with ❤️ for Oracle Health opportunities** - Demonstrating enterprise Java development, healthcare domain expertise, and cloud-native architecture skills.
