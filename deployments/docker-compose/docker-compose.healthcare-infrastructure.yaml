@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with Vector Extension
+  postgres-healthcare:
+    image: pgvector/pgvector:pg15
+    container_name: healthcare-postgres
+    environment:
+      POSTGRES_DB: healthcare_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    command: postgres -c shared_preload_libraries=vector
+    networks:
+      - healthcare-network
+
+  # MongoDB for Document Storage
+  mongodb-healthcare:
+    image: mongo:7.0
+    container_name: healthcare-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: healthcare_docs
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - healthcare-network
+
+  # Redis for Caching
+  redis-healthcare:
+    image: redis:7.2-alpine
+    container_name: healthcare-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass redis123
+    networks:
+      - healthcare-network
+
+  # Apache Kafka for Big Data Streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: healthcare-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - healthcare-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: healthcare-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    networks:
+      - healthcare-network
+
+  # Elasticsearch for Full-Text Search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: healthcare-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - healthcare-network
+
+  # Keycloak for Identity Management
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: healthcare-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-healthcare:5432/healthcare_db
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres-healthcare
+    command: start-dev
+    networks:
+      - healthcare-network
+
+  # Prometheus for Monitoring
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: healthcare-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - healthcare-network
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: healthcare-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana:/etc/grafana/provisioning
+    networks:
+      - healthcare-network
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: healthcare-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - healthcare-network
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    container_name: healthcare-otel-collector
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8889:8889"   # Prometheus metrics
+    volumes:
+      - ./configs/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    depends_on:
+      - jaeger
+      - prometheus
+    networks:
+      - healthcare-network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  healthcare-network:
+    driver: bridge
