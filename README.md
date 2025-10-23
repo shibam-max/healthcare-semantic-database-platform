@@ -407,10 +407,6 @@ This project demonstrates enterprise-level healthcare software development pract
 - **Cloud Optimization**: Enhanced AWS services integration
 - **Security Features**: Additional compliance and audit capabilities
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 **Important**: This is a demonstration project for educational and portfolio purposes. For production healthcare applications, ensure compliance with all applicable regulations including HIPAA, GDPR, and local healthcare data protection laws.
 
 ---
